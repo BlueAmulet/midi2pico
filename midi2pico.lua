@@ -11,6 +11,10 @@ local function print(...)
 	io.stderr:write(table.concat(args, "\t").."\n")
 end
 
+function math.round(n)
+	return math.floor(n+0.5)
+end
+
 if #args < 1 then
 	print([[
 Usage: ]] .. (arg and arg[0] or "midi2pico") .. [[ midi-file [p8-data]
@@ -45,19 +49,6 @@ local function arg2num(name)
 		error("Invalid value for option '" .. name .. "': " .. tostring(opts[name]), 0)
 	end
 	return val
-end
-
-local speed
-if not opts.speed then
-	print("Missing speed option.")
-	return
-else
-	speed = tonumber(tostring(opts.speed))
-	if not speed then
-		error("Invalid value for option 'speed': " .. tostring(opts.speed), 0)
-	elseif speed < 0 or speed > 255 then
-		error("Invalid range for option 'speed': " .. speed, 0)
-	end
 end
 
 -- Instrument to PICO-8 Map
@@ -168,6 +159,16 @@ if opts.mutet then
 	end
 end
 
+local speed
+if opts.speed then
+	speed = tonumber(tostring(opts.speed))
+	if not speed then
+		error("Invalid value for option 'speed': " .. tostring(opts.speed), 0)
+	elseif speed < 0 or speed > 255 then
+		error("Invalid range for option 'speed': " .. speed, 0)
+	end
+end
+
 local mode="channel"
 if opts.mode then
 	if opts.mode ~= "blob" and opts.mode ~= "channel" and opts.mode ~= "track" then
@@ -248,6 +249,7 @@ local function score2note(score)
 	return note
 end
 
+log(1, "Info: Loading and parsing midi file ...")
 local file, err=io.open(args[1], "rb")
 if not file then
 	print(err)
@@ -271,13 +273,6 @@ if not div then
 	log(1, "Info: Attempting to detect time division ...")
 	for i=2, #mididata do
 		local event=mididata[i]
-		if event[1] == "time_signature" then
-			log(1, "Info: Possible time division: " .. event[6])
-			break
-		end
-	end
-	for i=2, #mididata do
-		local event=mididata[i]
 		if event[1] == "note" and chlisten[event[5]] and trlisten[event[3]] then
 			local time = event[2]-skip
 			if time>0 then
@@ -296,6 +291,30 @@ if not div then
 		error("Failed to detect time division!", 0)
 	end
 	log(1, "Info: Detected: " .. div)
+end
+
+if not speed then
+	local ppq=mididata[1]
+	log(1, "Info: Attempting to detect speed ...")
+	local tempo
+	local warned=false
+	for i=2, #mididata do
+		local event=mididata[i]
+		if event[1] == "set_tempo" then
+			if not tempo then
+				tempo=event[4]
+			elseif not warned then
+				log(2, "Warning: midi changes tempo mid song, this is currently not supported.")
+				warned=true
+			end
+		end
+	end
+	if not tempo then
+		log(1, "Info: No tempo events, using default of 500000")
+		tempo=500000
+	end
+	speed=math.max(math.round(div*(tempo/1000/ppq)/(25/3)), 1)
+	log(1, "Info: Detected: " .. speed)
 end
 
 local function note2pico(note, drum)
@@ -442,9 +461,9 @@ local function parseevent(event)
 		pwheel[event[4]]=event[5]
 		local time=math.floor(event[2]/div)
 		local chunk=getChunk(time)
-		
+
 	else
-		
+
 	end
 end
 for i=2, #mididata do
@@ -461,8 +480,9 @@ if die then
 end
 log(1, "Info: Extending notes ...")
 local cpparm={"note", "vol", "vel", "prgm", "pwheel", "ch"}
+local lostnotes=0
 for i=0, mtime do
-	if slice[i]	then
+	if slice[i] then
 		local chunk=slice[i]
 		for j=1, 4 do
 			if chunk[j] and chunk[j].durat then
@@ -479,10 +499,14 @@ for i=0, mtime do
 						end
 						chunk2[j].pos=((k == kstop) and "E" or "M")
 					else
+						local lost=kstop - k + 1
+						local lchunk=slice[i+k-1][j]
 						if k > 1 then
-							slice[i+k-1][j].pos="E"
+							lchunk.pos="E"
 						end
-						log(2, "Warning: Note blocking Note, lost " .. (kstop - k + 1))
+						logf(2, "Warning: Note blocking Note, lost %d", lost)
+						lchunk.lost=lost
+						lostnotes=lostnotes+lost
 						break
 					end
 				end
@@ -491,6 +515,63 @@ for i=0, mtime do
 			end
 		end
 	end
+end
+if lostnotes>0 then
+	logf(1, "Info: Lost %d notes", lostnotes)
+end
+if lostnotes>0 and not opts.noregain then
+	local regained=0
+	log(1, "Info: Attempting to regain notes ...")
+	for i=0, mtime do
+		if slice[i] then
+			local chunk=slice[i]
+			for j=1, 4 do
+				local schunk=chunk[j]
+				if schunk and schunk.lost then
+					local chunk2=getChunk(i+1)
+					local tj
+					for k=1, 4 do
+						if not chunk2[k] or not chunk2[k].note then
+							tj=k
+							break
+						end
+					end
+					if tj then
+						for k=1, schunk.lost do
+							mtime = math.max(mtime, i+k)
+							local chunk2=getChunk(i+k)
+							if not chunk2[tj] then
+								chunk2[tj]={}
+							end
+							if not chunk2[tj].note then
+								for i=1,#cpparm do
+									chunk2[tj][cpparm[i]]=schunk[cpparm[i]]
+								end
+								chunk2[tj].pos=((k == schunk.lost) and "E" or "M")
+								if k == schunk.lost then
+									logf(2, "Warning: Regained %d notes", schunk.lost)
+									regained=regained+schunk.lost
+								end
+							else
+								local lost=schunk.lost - k + 1
+								local lchunk=slice[i+k-1][tj]
+								if k > 1 then
+									lchunk.pos="E"
+								end
+								logf(2, "Warning: Regained %d notes", k-1)
+								lchunk.lost=lost
+								regained=regained+k-1
+								break
+							end
+						end
+						schunk.lost=nil
+						schunk.pos="M"
+					end
+				end
+			end
+		end
+	end
+	logf(1, "Info: Regained %d notes", regained)
 end
 if not opts.no2ndpass then
 	log(1, "Info: Performing second corrective pass ...")
@@ -589,11 +670,11 @@ if not opts.no2ndpass then
 				for j=1, 4 do
 					if chunk[j] then
 						local schunk=chunk[j]
-						if vol[schunk.ch] ~= schunk.vol then
+						if vol[schunk.ch] ~= schunk.vol and not opts.novol then
 							logf(1, "Warning: Corrected volume from %s to %s", schunk.vol, vol[schunk.ch])
 						end
 						schunk.vol=vol[schunk.ch]
-						if pwheel[schunk.ch] ~= schunk.pwheel then
+						if pwheel[schunk.ch] ~= schunk.pwheel and not opts.nopwheel then
 							logf(1, "Warning: Corrected pitch wheel from %s to %s", schunk.pwheel, pwheel[schunk.ch])
 						end
 						schunk.pwheel=pwheel[schunk.ch]
@@ -627,9 +708,9 @@ for block=0, pats*32, 32 do
 		log(1, "Info: Saved " .. 4-top .. " in pattern " .. block/32)
 	end
 end
-local patmap={}
 --Diagnostics only, needs fixing.
 --[[
+local patmap={}
 for block=0, pats*32, 32 do
 	for block2=block+32, pats*32, 32 do
 		local same=true
