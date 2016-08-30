@@ -24,7 +24,8 @@ Options:
 	--mute    Mute channels (Comma separated, 0=All)
 	--mutet   Mute tracks (Comma separated)
 	--mode    Arragement mode (blob/channel/track)
-	--shift   Pitch shift (0)
+	--shift   Pitch shift, instruments (0)
+	--dshift  Pitch shift, drums (0)
 
 	All options above take the form: --name=value
 
@@ -39,7 +40,7 @@ Options:
 end
 
 local function arg2num(name)
-	val = tonumber(opts[name])
+	val = tonumber(tostring(opts[name]), 10)
 	if not val then
 		error("Invalid value for option '" .. name .. "': " .. tostring(opts[name]), 0)
 	end
@@ -89,6 +90,13 @@ trlisten_mt={__index=function(t,k)
 	return t.default
 end}
 local trlisten=setmetatable({default=true},trlisten_mt)
+
+-- Drum Channels
+local drumch={}
+for i=0, 15 do
+	drumch[i]=false
+end
+drumch[9]=true
 
 local maxlevel = math.huge
 if opts.level then
@@ -181,6 +189,11 @@ end
 local shift=0
 if opts.shift then
 	shift=arg2num("shift")
+end
+
+local dshift=0
+if opts.dshift then
+	dshift=arg2num("dshift")
 end
 
 local text_events={
@@ -285,14 +298,15 @@ if not div then
 	log(1, "Info: Detected: " .. div)
 end
 
-local function note2pico(note)
-	local val = (note-36)+shift
+local function note2pico(note, drum)
+	local val = (note-36)+(drum and dshift or shift)
+	local msg = (drum and "Drum note" or "Note")
 	if val > 63 then
-		logf(2, "Warning: Note too high, truncating: %d, %+d", val, val-63)
+		logf(2, "Warning: %s too high, truncating: %d, %+d", msg, val, val-63)
 		val = 63
 	end
 	if val < 0 then
-		log(2, "Warning: Note too low, truncating: " .. val)
+		logf(2, "Warning: %s too low, truncating: %d", msg, val)
 		val = 0
 	end
 	return val
@@ -683,7 +697,8 @@ for block=0, pats*32, 32 do
 					info.vel=127
 				end
 				local instr = info.prgm
-				local val = note2pico(math.floor(info.note+info.pwheel+0.5))
+				local drum = drumch[info.ch]
+				local val = note2pico(math.floor(info.note+info.pwheel+0.5), drum)
 				if val <= 63 then
 					local place=3
 					if info.pos=="S" then
@@ -691,7 +706,7 @@ for block=0, pats*32, 32 do
 					elseif info.pos=="E" then
 						place=4
 					end
-					line = line .. string.format("%02x%x%s%x", val, info.ch == 9 and picodrum[instr][1] or picoinstr[instr][1], info.ch == 9 and drumvol or math.floor((info.vol/127)*(info.vel/127)*(maxvol-1)+1.5), info.ch == 9 and picodrum[instr][place] or picoinstr[instr][place])
+					line = line .. string.format("%02x%x%s%x", val, drum and picodrum[instr][1] or picoinstr[instr][1], drum and drumvol or math.floor((info.vol/127)*(info.vel/127)*(maxvol-1)+1.5), drum and picodrum[instr][place] or picoinstr[instr][place])
 				else
 					log(2, "Dropping high pitched note.")
 					line = line .. "00000"
@@ -704,7 +719,7 @@ for block=0, pats*32, 32 do
 			linemap[line]=base+j-1
 			if count >= 64 and not opts.notrunc then
 				outfile:close()
-				error("Midi is too long or time division is too short.\nUse --notrunc to continue writing.")
+				error("Midi is too long or time division is too short.\nUse --notrunc to continue writing.", 0)
 			end
 			outfile:write(line.." "..string.format("%02x", count).."\n")
 			count=count+1
@@ -753,7 +768,7 @@ for block=0, pats do
 				logf(2, "Warning: Ran out of sfx: %d, (%02x)", patblock[i], patblock[i])
 			else
 				outfile:close()
-				error("Midi is too long or time division is too short.\nUse --notrunc to continue writing.")
+				error("Midi is too long or time division is too short.\nUse --notrunc to continue writing.", 0)
 			end
 		end
 		if not patblock[i] or patblock[i] == -1 then
