@@ -26,7 +26,14 @@ Options:
 	--mode    Arragement mode (blob/channel/track)
 	--shift   Pitch shift (0)
 
-	All options take the form: --name=value
+	All options above take the form: --name=value
+
+	--no2ndpass Skip second corrective pass
+	--nopwheel  Ignore pitch wheel data
+	--novol     Ignore volume data
+	--notrunc   Keep going despite no more sfx
+
+	All options above take the form: --name
 ]])
 	return
 end
@@ -471,110 +478,112 @@ for i=0, mtime do
 		end
 	end
 end
-log(1, "Info: Performing second corrective pass ...")
-resetmidi()
-local pass2nd={}
-local function parseevent2(event)
-	if event[1] == "control_change" then
-		if event[5] == 6 then
-			if lrpn==true then
-				rpn[event[4]][rpns[event[4]]]=event[6]
-				if rpns[event[4]]==0 then
-					local time=math.floor(event[2]/div)
-					if not pass2nd[time] then
-						pass2nd[time]={}
+if not opts.no2ndpass then
+	log(1, "Info: Performing second corrective pass ...")
+	resetmidi()
+	local pass2nd={}
+	local function parseevent2(event)
+		if event[1] == "control_change" then
+			if event[5] == 6 then
+				if lrpn==true then
+					rpn[event[4]][rpns[event[4]]]=event[6]
+					if rpns[event[4]]==0 then
+						local time=math.floor(event[2]/div)
+						if not pass2nd[time] then
+							pass2nd[time]={}
+						end
+						local chunk=pass2nd[time]
+						if not chunk.pwheel then
+							chunk.pwheel={}
+						end
+						chunk.pwheel[event[4]]=pwheel[event[4]]/8192*event[6]
 					end
-					local chunk=pass2nd[time]
-					if not chunk.pwheel then
-						chunk.pwheel={}
-					end
-					chunk.pwheel[event[4]]=pwheel[event[4]]/8192*event[6]
+				elseif lrpn==false then
+					nrpn[event[4]][nrpns[event[4]]]=event[6]
 				end
-			elseif lrpn==false then
-				nrpn[event[4]][nrpns[event[4]]]=event[6]
+				lrpn=nil
+			elseif event[5] == 7 then
+				local time=math.floor(event[2]/div)
+				if not pass2nd[time] then
+					pass2nd[time]={}
+				end
+				local chunk=pass2nd[time]
+				if not chunk.vol then
+					chunk.vol={}
+				end
+				chunk.vol[event[4]]=event[6]
+			elseif event[5] == 98 then
+				nrpns[event[4]] = bit.bor(bit.band(nrpns[event[4]], 0x3f80), event[6])
+				lrpn=false
+			elseif event[5] == 99 then
+				nrpns[event[4]] = bit.bor(bit.band(nrpns[event[4]], 0x7f), bit.lshift(event[6], 7))
+				lrpn=false
+			elseif event[5] == 100 then
+				rpns[event[4]] = bit.bor(bit.band(rpns[event[4]], 0x3f80), event[6])
+				lrpn=true
+			elseif event[5] == 101 then
+				rpns[event[4]] = bit.bor(bit.band(rpns[event[4]], 0x7f), bit.lshift(event[6], 7))
+				lrpn=true
 			end
-			lrpn=nil
-		elseif event[5] == 7 then
+		elseif event[1] == "patch_change" then
+			prgm[event[4]]=event[5]
+		elseif event[1] == "pitch_wheel_change" then
+			pwheel[event[4]]=event[5]
 			local time=math.floor(event[2]/div)
 			if not pass2nd[time] then
 				pass2nd[time]={}
 			end
 			local chunk=pass2nd[time]
-			if not chunk.vol then
-				chunk.vol={}
+			if not chunk.pwheel then
+				chunk.pwheel={}
 			end
-			chunk.vol[event[4]]=event[6]
-		elseif event[5] == 98 then
-			nrpns[event[4]] = bit.bor(bit.band(nrpns[event[4]], 0x3f80), event[6])
-			lrpn=false
-		elseif event[5] == 99 then
-			nrpns[event[4]] = bit.bor(bit.band(nrpns[event[4]], 0x7f), bit.lshift(event[6], 7))
-			lrpn=false
-		elseif event[5] == 100 then
-			rpns[event[4]] = bit.bor(bit.band(rpns[event[4]], 0x3f80), event[6])
-			lrpn=true
-		elseif event[5] == 101 then
-			rpns[event[4]] = bit.bor(bit.band(rpns[event[4]], 0x7f), bit.lshift(event[6], 7))
-			lrpn=true
+			chunk.pwheel[event[4]]=event[5]/8192*rpn[event[4]][0]
 		end
-	elseif event[1] == "patch_change" then
-		prgm[event[4]]=event[5]
-	elseif event[1] == "pitch_wheel_change" then
-		pwheel[event[4]]=event[5]
-		local time=math.floor(event[2]/div)
-		if not pass2nd[time] then
-			pass2nd[time]={}
+	end
+	for i=2, #mididata do
+		local event = mididata[i]
+		local ok, err = pcall(parseevent2, event)
+		if not ok then
+			io.stderr:write("Crashed parsing event : {" .. table.concat(event, ", ") .. "}\n\n" .. err .. "\n")
+			os.exit(1)
 		end
-		local chunk=pass2nd[time]
-		if not chunk.pwheel then
-			chunk.pwheel={}
+	end
+	do
+		local vol={}
+		local pwheel={}
+		for i=0,15 do
+			vol[i]=127
+			pwheel[i]=0
 		end
-		chunk.pwheel[event[4]]=event[5]/8192*rpn[event[4]][0]
-	end
-end
-for i=2, #mididata do
-	local event = mididata[i]
-	local ok, err = pcall(parseevent2, event)
-	if not ok then
-		io.stderr:write("Crashed parsing event : {" .. table.concat(event, ", ") .. "}\n\n" .. err .. "\n")
-		os.exit(1)
-	end
-end
-do
-	local vol={}
-	local pwheel={}
-	for i=0,15 do
-		vol[i]=127
-		pwheel[i]=0
-	end
-	for i=0, mtime do
-		if pass2nd[i] then
-			local vold=pass2nd[i].vol
-			local pwheeld=pass2nd[i].pwheel
-			if vold then
-				for i=0, 15 do
-					if vold[i] then vol[i]=vold[i] end
+		for i=0, mtime do
+			if pass2nd[i] then
+				local vold=pass2nd[i].vol
+				local pwheeld=pass2nd[i].pwheel
+				if vold then
+					for i=0, 15 do
+						if vold[i] then vol[i]=vold[i] end
+					end
+				end
+				if pwheeld then
+					for i=0, 15 do
+						if pwheeld[i] then pwheel[i]=pwheeld[i] end
+					end
 				end
 			end
-			if pwheeld then
-				for i=0, 15 do
-					if pwheeld[i] then pwheel[i]=pwheeld[i] end
-				end
-			end
-		end
-		local chunk=slice[i]
-		if chunk then
-			for j=1, 4 do
-				if chunk[j] then
-					local schunk=chunk[j]
-					if vol[schunk.ch] ~= schunk.vol then
-						logf(1, "Warning: Corrected volume from %s to %s", schunk.vol, vol[schunk.ch])
+			local chunk=slice[i]
+			if chunk then
+				for j=1, 4 do
+					if chunk[j] then
+						local schunk=chunk[j]
+						if vol[schunk.ch] ~= schunk.vol then
+							logf(1, "Warning: Corrected volume from %s to %s", schunk.vol, vol[schunk.ch])
+						end
+						schunk.vol=vol[schunk.ch]
+						if pwheel[schunk.ch] ~= schunk.pwheel then
+							logf(1, "Warning: Corrected pitch wheel from %s to %s", schunk.pwheel, pwheel[schunk.ch])
+						end
+						schunk.pwheel=pwheel[schunk.ch]
 					end
-					schunk.vol=vol[schunk.ch]
-					if pwheel[schunk.ch] ~= schunk.pwheel then
-						logf(1, "Warning: Corrected pitch wheel from %s to %s", schunk.pwheel, pwheel[schunk.ch])
-					end
-					schunk.pwheel=pwheel[schunk.ch]
 				end
 			end
 		end
@@ -666,6 +675,13 @@ for block=0, pats*32, 32 do
 			local chunk=getChunk(i+block)
 			if chunk[j] and chunk[j].note then
 				local info = chunk[j]
+				if opts.nopwheel then
+					info.pwheel=0
+				end
+				if opts.novol then
+					info.vol=127
+					info.vel=127
+				end
 				local instr = info.prgm
 				local val = note2pico(math.floor(info.note+info.pwheel+0.5))
 				if val <= 63 then
@@ -686,6 +702,10 @@ for block=0, pats*32, 32 do
 		end
 		if not linemap[line] then
 			linemap[line]=base+j-1
+			if count >= 64 and not opts.notrunc then
+				outfile:close()
+				error("Midi is too long or time division is too short.\nUse --notrunc to continue writing.")
+			end
 			outfile:write(line.." "..string.format("%02x", count).."\n")
 			count=count+1
 		else
@@ -729,7 +749,12 @@ for block=0, pats do
 	local patblock = patsel[block]
 	for i=1, 4 do
 		if patblock[i] and patblock[i] >= 0x40 then
-			logf(2, "Warning: Ran out of sfx: %d, (%02x)", patblock[i], patblock[i])
+			if opts.notrunc then
+				logf(2, "Warning: Ran out of sfx: %d, (%02x)", patblock[i], patblock[i])
+			else
+				outfile:close()
+				error("Midi is too long or time division is too short.\nUse --notrunc to continue writing.")
+			end
 		end
 		if not patblock[i] or patblock[i] == -1 then
 			patblock[i]=0x40
