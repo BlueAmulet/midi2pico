@@ -313,8 +313,9 @@ if not speed then
 		log(1, "Info: No tempo events, using default of 500000")
 		tempo=500000
 	end
-	speed=math.max(math.round(div*(tempo/1000/ppq)/(25/3)), 1)
-	log(1, "Info: Detected: " .. speed)
+	local fspeed=div*(tempo/1000/ppq)/(25/3)
+	speed=math.max(math.round(fspeed), 1)
+	logf(1, "Info: Detected: %s (%d)", fspeed, speed)
 end
 
 local function note2pico(note, drum)
@@ -671,11 +672,11 @@ if not opts.no2ndpass then
 					if chunk[j] then
 						local schunk=chunk[j]
 						if vol[schunk.ch] ~= schunk.vol and not opts.novol then
-							logf(1, "Warning: Corrected volume from %s to %s", schunk.vol, vol[schunk.ch])
+							logf(2, "Warning: Corrected volume from %s to %s", schunk.vol, vol[schunk.ch])
 						end
 						schunk.vol=vol[schunk.ch]
 						if pwheel[schunk.ch] ~= schunk.pwheel and not opts.nopwheel then
-							logf(1, "Warning: Corrected pitch wheel from %s to %s", schunk.pwheel, pwheel[schunk.ch])
+							logf(2, "Warning: Corrected pitch wheel from %s to %s", schunk.pwheel, pwheel[schunk.ch])
 						end
 						schunk.pwheel=pwheel[schunk.ch]
 					end
