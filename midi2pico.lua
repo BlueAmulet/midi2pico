@@ -304,7 +304,7 @@ if not speed then
 			if not tempo then
 				tempo=event[4]
 			elseif not warned then
-				log(2, "Warning: midi changes tempo mid song, this is currently not supported.")
+				log(1, "Info: midi changes tempo mid song, this is currently not supported.")
 				warned=true
 			end
 		end
@@ -313,7 +313,7 @@ if not speed then
 		log(1, "Info: No tempo events, using default of 500000")
 		tempo=500000
 	end
-	local fspeed=div*(tempo/1000/ppq)/(25/3)
+	local fspeed=div*(tempo/1000/ppq)/(1220/147)
 	speed=math.max(math.round(fspeed), 1)
 	logf(1, "Info: Detected: %s (%d)", fspeed, speed)
 end
