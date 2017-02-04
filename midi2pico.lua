@@ -22,6 +22,7 @@ Usage: ]] .. (arg and arg[0] or "midi2pico") .. [[ midi-file [p8-data]
 Options:
 	--maxvol  Maximum volume (0-7, 5)
 	--drumvol Drum volume, (0-7, 2)
+	--chvol   Per channel volume (Comma separated, ch:vol format)
 	--div     Time division slices (Auto)
 	--level   Logging level
 	--speed   Music speed (0-255)
@@ -89,6 +90,12 @@ for i=0, 15 do
 end
 drumch[9]=true
 
+-- Per Channel Volume
+local chvol={}
+for i=0, 15 do
+	chvol[i]=5
+end
+
 local maxlevel = math.huge
 if opts.level then
 	maxlevel = arg2num("level")
@@ -106,13 +113,15 @@ local function logf(level, ...)
 	end
 end
 
-local maxvol = 5
 if opts.maxvol then
-	maxvol = tonumber(tostring(opts.maxvol))
+	local maxvol = tonumber(tostring(opts.maxvol))
 	if not maxvol then
 		error("Invalid value for option 'maxvol': " .. tostring(opts.maxvol), 0)
 	elseif maxvol < 0 or maxvol > 7 then
 		error("Invalid range for option 'maxvol': " .. maxvol, 0)
+	end
+	for i=0, 15 do
+		chvol[i]=maxvol
 	end
 end
 
@@ -169,9 +178,31 @@ if opts.speed then
 	end
 end
 
+if opts.chvol then
+	for part in (opts.chvol .. ","):gmatch("(.-),") do
+		local ch, vol=part:match("(.*):(.+)")
+		ch=tonumber(ch,10)
+		vol=tonumber(vol,10)
+		if ch == nil or vol == nil then
+			error("Invalid value for option 'chvol': " .. part, 0)
+		elseif ch < 1 or ch > 16 then
+			error("Invalid channel for option 'chvol': " .. ch, 0)
+		elseif vol < 0 or vol > 7 then
+			error("Invalid volume for option 'chvol': " .. vol, 0)
+		else
+			chvol[ch-1]=vol
+		end
+	end
+end
+
+local amodes={
+blob=true,
+channel=true,
+track=true
+}
 local mode="channel"
 if opts.mode then
-	if opts.mode ~= "blob" and opts.mode ~= "channel" and opts.mode ~= "track" then
+	if not amodes[opts.mode] then
 		error("Invalid value for option 'mode': " .. opts.mode, 0)
 	end
 	mode=opts.mode
@@ -788,7 +819,7 @@ for block=0, pats*32, 32 do
 					elseif info.pos=="E" then
 						place=4
 					end
-					line = line .. string.format("%02x%x%s%x", val, drum and picodrum[instr][1] or picoinstr[instr][1], drum and drumvol or math.floor((info.vol/127)*(info.vel/127)*(maxvol-1)+1.5), drum and picodrum[instr][place] or picoinstr[instr][place])
+					line = line .. string.format("%02x%x%s%x", val, drum and picodrum[instr][1] or picoinstr[instr][1], drum and drumvol or math.floor((info.vol/127)*(info.vel/127)*(chvol[info.ch]-1)+1.5), drum and picodrum[instr][place] or picoinstr[instr][place])
 				else
 					log(2, "Dropping high pitched note.")
 					line = line .. "00000"
