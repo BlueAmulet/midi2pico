@@ -55,20 +55,26 @@ end
 -- Instrument to PICO-8 Map
 local picoinstr={}
 for i=0, 127 do
-	picoinstr[i]={1, 0, 0, 5}
+	picoinstr[i]={3, 0, 0, 5}
 end
+picoinstr[30]={5, 0, 0, 5} -- Distortd
+picoinstr[33]={1, 0, 0, 5} -- FngrBass
+picoinstr[38]={1, 0, 0, 5} -- SynBass1
+picoinstr[42]={5, 4, 0, 5} -- Cello
 picoinstr[71]={5, 4, 0, 5} -- Clarinet
 picoinstr[81]={2, 0, 0, 0} -- SawLd
+picoinstr[105]={5, 0, 0, 5} -- Banjo
 
 -- Drums to PICO-8 Map
 local picodrum={}
-for i=35, 82 do
-	picodrum[i]={6, 0, 0, 5}
-end
--- TODO: I'm getting weird instrument numbers for drums.
 for i=0, 127 do
-	picodrum[i]={6, 0, 0, 5}
+	picodrum[i]={6, 5, -1, -1, 84}
 end
+picodrum[35]={2, 0, 0, 5, 42}
+picodrum[37]={6, 5,-1,-1, 64}
+picodrum[40]={6, 0, 0, 5, 64}
+picodrum[42]={6, 5,-1,-1, 90}
+picodrum[53]={5, 0, 0, 5, 90}
 
 -- Allowed Channels
 local chlisten={}
@@ -412,6 +418,10 @@ local function parseevent(event)
 		stime=math.min(stime, time)
 		local chunk=getChunk(time)
 		local chunkdata={note=event[6], vol=vol[event[5]], vel=event[7], prgm=prgm[event[5]], pwheel=pwheel[event[5]]/8192*rpn[event[5]][0], ch=event[5], durat=event[4]}
+		if drumch[event[5]] then
+			chunkdata.prgm=chunkdata.note
+			chunkdata.note=picodrum[chunkdata.prgm][5]
+		end
 		local placed=false
 		if mode == "blob" then
 			if #chunk < 4 then
@@ -490,10 +500,11 @@ local function parseevent(event)
 	elseif event[1] == "patch_change" then
 		prgm[event[4]]=event[5]
 	elseif event[1] == "pitch_wheel_change" then
-		pwheel[event[4]]=event[5]
-		local time=math.floor(event[2]/div)
-		local chunk=getChunk(time)
-
+		if not drumch[event[4]] then
+			pwheel[event[4]]=event[5]
+		else
+			logf(2, "Warning: Ignoring pitch wheel event on drum channel: " .. event[4])
+		end
 	else
 
 	end
@@ -819,7 +830,12 @@ for block=0, pats*32, 32 do
 					elseif info.pos=="E" then
 						place=4
 					end
-					line = line .. string.format("%02x%x%s%x", val, drum and picodrum[instr][1] or picoinstr[instr][1], drum and drumvol or math.floor((info.vol/127)*(info.vel/127)*(chvol[info.ch]-1)+1.5), drum and picodrum[instr][place] or picoinstr[instr][place])
+					local instrdata = drum and picodrum[instr] or picoinstr[instr]
+					if instrdata[place] ~= -1 then
+						line = line .. string.format("%02x%x%s%x", val, instrdata[1], drum and drumvol or math.floor((info.vol/127)*(info.vel/127)*(chvol[info.ch]-1)+1.5), instrdata[place])
+					else
+						line = line .. "00000"
+					end
 				else
 					log(2, "Dropping high pitched note.")
 					line = line .. "00000"
