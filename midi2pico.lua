@@ -34,6 +34,7 @@ Options:
 
 	All options above take the form: --name=value
 
+	--clean     Don't output sfx and pattern info at end of lines
 	--no2ndpass Skip second corrective pass
 	--nopwheel  Ignore pitch wheel data
 	--novol     Ignore volume data
@@ -850,7 +851,7 @@ for block=0, pats*32, 32 do
 				outfile:close()
 				error("Midi is too long or time division is too short.\nUse --notrunc to continue writing.", 0)
 			end
-			outfile:write(line.." "..string.format("%02x", count).."\n")
+			outfile:write(line..(not opts.clean and string.format(" %02x", count) or "").."\n")
 			count=count+1
 		else
 			linemap[base+j-1]=linemap[line]
@@ -910,7 +911,7 @@ for block=0, pats do
 	local pats = table.concat(patblock, "")
 	if not first or pats ~= "40404040" then
 		first=false
-		outfile:write(line .. table.concat(patblock, "").."\n")
+		outfile:write(line .. table.concat(patblock, "")..(not opts.clean and " "..block or "").."\n")
 	end
 end
 if args[2] then
