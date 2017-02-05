@@ -636,6 +636,9 @@ if lostnotes>0 and not opts.noregain then
 		end
 	end
 	logf(1, "Info: Regained %d notes", regained)
+	if lostnotes == regained then
+		logf(1, "Info: Regained all notes back!")
+	end
 end
 if not opts.no2ndpass then
 	log(1, "Info: Performing second corrective pass ...")
