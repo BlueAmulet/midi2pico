@@ -5,6 +5,10 @@ Requires [MIDI.lua](http://www.pjb.com.au/comp/lua/MIDI.html) [(direct link)](ht
 ```
 # luarocks install midi
 ```
+Lua 5.1 users will also need a bit32 library:
+```
+# luarocks install bit32
+```
 
 ## Usage:
 ```

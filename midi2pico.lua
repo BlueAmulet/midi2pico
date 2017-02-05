@@ -1,7 +1,4 @@
 #!/usr/bin/env lua
-local parse = require("argparse")
-
-local args, opts = parse(...)
 
 local function print(...)
 	local args=table.pack(...)
@@ -10,6 +7,33 @@ local function print(...)
 	end
 	io.stderr:write(table.concat(args, "\t").."\n")
 end
+
+-- LuaJIT and Lua5.1 compatibility
+if not table.pack then
+	function table.pack(...) return {n=select("#", ...), ...} end
+end
+
+local bit=bit
+if not bit then
+	local ok
+	ok, bit=pcall(require, "bit32")
+	if not ok then
+		print(bit)
+		print("bit32 api is missing, please install via: luarocks install bit32")
+		os.exit(1)
+	end
+end
+
+local ok, midi = pcall(require, "MIDI")
+if not ok then
+	print(midi)
+	print("MIDI api is missing, please install via: luarocks install midi")
+	os.exit(1)
+end
+
+local parse = require("argparse")
+
+local args, opts = parse(...)
 
 function math.round(n)
 	return math.floor(n+0.5)
@@ -296,8 +320,6 @@ end
 local data=file:read("*a")
 file:close()
 
-local midi = require("MIDI")
-
 local mididata = score2note(midi.midi2score(data))
 
 local function gcd(m, n)
@@ -369,8 +391,6 @@ local function note2pico(note, drum)
 	end
 	return val
 end
-
-local bit = require("bit32")
 
 local slice={}
 local function getChunk(i)
