@@ -1,7 +1,7 @@
 # midi2pico
 A Midi to PICO-8 converter.
 
-Requires [MIDI.lua](http://www.pjb.com.au/comp/lua/MIDI.html)  
+Requires [MIDI.lua](http://www.pjb.com.au/comp/lua/MIDI.html) [(direct link)](http://www.pjb.com.au/comp/lua/MIDI.lua)
 ```
 # luarocks install midi
 ```
