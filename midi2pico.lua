@@ -88,28 +88,55 @@ local function arg2num(name)
 end
 
 -- Instrument to PICO-8 Map
-local picoinstr={}
+local picoinstr={
+	[0]={1, 0, 0, 5},
+	[1]={1, 0, 0, 5},
+	[3]={1, 2, 2, 5},
+	[4]={0, 0, 0, 5},
+	[5]={5, 0, 0, 5},
+	[7]={4, 0, 0, 5},
+	[11]={1, 0, 0, 5},
+	[16]={5, 0, 0, 5},
+	[17]={0, 0, 0, 5},
+	[18]={5, 2, 2, 5},
+	[19]={5, 4, 0, 5},
+	[20]={5, 4, 0, 5},
+	[30]={4, 0, 0, 5},
+	[33]={1, 0, 0, 5},
+	[38]={1, 0, 0, 5},
+	[42]={5, 4, 0, 5},
+	[71]={5, 4, 0, 5},
+	[72]={1, 4, 0, 5},
+	[73]={5, 4, 2, 5},
+	[74]={5, 4, 0, 5},
+	[78]={0, 4, 0, 5},
+	[79]={0, 4, 0, 5},
+	[81]={2, 0, 0, 0},
+	[89]={1, 4, 0, 5},
+	[97]={4, 4, 0, 5},
+	[100]={5, 0, 0, 5},
+	[101]={0, 4, 0, 5},
+	[105]={4, 0, 0, 5},
+}
 for i=0, 127 do
-	picoinstr[i]={3, 0, 0, 5}
+	if picoinstr[i] == nil then
+		picoinstr[i]={3, 0, 0, 5}
+	end
 end
-picoinstr[30]={4, 0, 0, 5} -- Distortd
-picoinstr[33]={1, 0, 0, 5} -- FngrBass
-picoinstr[38]={1, 0, 0, 5} -- SynBass1
-picoinstr[42]={5, 4, 0, 5} -- Cello
-picoinstr[71]={5, 4, 0, 5} -- Clarinet
-picoinstr[81]={2, 0, 0, 0} -- SawLd
-picoinstr[105]={5, 0, 0, 5} -- Banjo
 
 -- Drums to PICO-8 Map
-local picodrum={}
+local picodrum={
+	[35]={2, 0, 0, 5, 42},
+	[37]={6, 5,-1,-1, 64},
+	[40]={6, 0, 0, 5, 64},
+	[42]={6, 5,-1,-1, 90},
+	[53]={5, 0, 0, 5, 90},
+}
 for i=0, 127 do
-	picodrum[i]={6, 5,-1,-1, 84}
+	if picodrum[i] == nil then
+		picodrum[i]={6, 5,-1,-1, 84}
+	end
 end
-picodrum[35]={2, 0, 0, 5, 42}
-picodrum[37]={6, 5,-1,-1, 64}
-picodrum[40]={6, 0, 0, 5, 64}
-picodrum[42]={6, 5,-1,-1, 90}
-picodrum[53]={5, 0, 0, 5, 90}
 
 -- Allowed Channels
 local chlisten={}
