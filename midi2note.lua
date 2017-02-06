@@ -1,7 +1,7 @@
 #!/usr/bin/env lua
-local parse = require("argparse")
+local parse=require("argparse")
 
-local args, opts = parse(...)
+local args, opts=parse(...)
 
 local function print(...)
 	local args=table.pack(...)
@@ -42,48 +42,48 @@ text_event_0e=true,
 text_event_0f=true,
 }
 local function score2note(score)
-	local note = {score[1]}
+	local note={score[1]}
 	local trackpos={}
-	local nscore = #score
-	for i = 2, nscore do
+	local nscore=#score
+	for i=2, nscore do
 		trackpos[i]=1
 	end
 	while true do
 		local ltime, tpos=math.huge
-		for i = 2, nscore do
-			local event = score[i][trackpos[i]]
+		for i=2, nscore do
+			local event=score[i][trackpos[i]]
 			if event then
-				local ttime = event[2]
+				local ttime=event[2]
 				if ttime < ltime then
-					ltime, tpos = ttime, i
+					ltime, tpos=ttime, i
 				end
 			end
 		end
 		if not tpos then break end
-		local event = score[tpos][trackpos[tpos]]
-		score[tpos][trackpos[tpos]] = nil
-		trackpos[tpos] = trackpos[tpos] + 1
+		local event=score[tpos][trackpos[tpos]]
+		score[tpos][trackpos[tpos]]=nil
+		trackpos[tpos]=trackpos[tpos] + 1
 		table.insert(event, 3, tpos-2)
 		-- Merge text events into one event type
 		local kind=event[1]
 		if text_events[kind] then
-			kind=kind:gsub("_event",""):gsub("_text","")
+			kind=kind:gsub("_event", ""):gsub("_text", "")
 			table.insert(event, 4, kind)
 			event[1]="text"
 		end
-		note[#note+1] = event
+		note[#note+1]=event
 	end
 	return note
 end
 
-local midi = require("MIDI")
+local midi=require("MIDI")
 
-local note = score2note(midi.midi2score(data))
+local note=score2note(midi.midi2score(data))
 
 local outfile, err
 if args[2] then
 	print("Writing to '" .. args[2] .. "'")
-	outfile, err = io.open(args[2], "wb")
+	outfile, err=io.open(args[2], "wb")
 	if not outfile then
 		error(err, 0)
 	end
@@ -92,8 +92,8 @@ else
 	outfile=io.stdout
 end
 outfile:write("Ticks per beat: " .. note[1].."\n")
-for i=2,#note do
-	outfile:write(table.concat(note[i],", ").."\n")
+for i=2, #note do
+	outfile:write(table.concat(note[i], ", ").."\n")
 end
 if args[2] then
 	outfile:close()

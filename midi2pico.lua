@@ -24,16 +24,16 @@ if not bit then
 	end
 end
 
-local ok, midi = pcall(require, "MIDI")
+local ok, midi=pcall(require, "MIDI")
 if not ok then
 	print(midi)
 	print("MIDI api is missing, please install via: luarocks install midi")
 	os.exit(1)
 end
 
-local parse = require("argparse")
+local parse=require("argparse")
 
-local args, opts = parse(...)
+local args, opts=parse(...)
 
 function math.round(n)
 	return math.floor(n+0.5)
@@ -79,7 +79,7 @@ MusicHAX:
 end
 
 local function arg2num(name)
-	val = tonumber(tostring(opts[name]), 10)
+	val=tonumber(tostring(opts[name]), 10)
 	if not val then
 		error("Invalid value for option '" .. name .. "': " .. tostring(opts[name]), 0)
 	end
@@ -102,7 +102,7 @@ picoinstr[105]={5, 0, 0, 5} -- Banjo
 -- Drums to PICO-8 Map
 local picodrum={}
 for i=0, 127 do
-	picodrum[i]={6, 5, -1, -1, 84}
+	picodrum[i]={6, 5,-1,-1, 84}
 end
 picodrum[35]={2, 0, 0, 5, 42}
 picodrum[37]={6, 5,-1,-1, 64}
@@ -117,11 +117,11 @@ for i=0, 15 do
 end
 
 -- Allowed Tracks
-trlisten_mt={__index=function(t,k)
+trlisten_mt={__index=function(t, k)
 	t[k]=t.default
 	return t.default
 end}
-local trlisten=setmetatable({default=true},trlisten_mt)
+local trlisten=setmetatable({default=true}, trlisten_mt)
 
 -- Drum Channels
 local drumch={}
@@ -136,9 +136,9 @@ for i=0, 15 do
 	chvol[i]=5
 end
 
-local maxlevel = math.huge
+local maxlevel=math.huge
 if opts.level then
-	maxlevel = arg2num("level")
+	maxlevel=arg2num("level")
 end
 
 local function log(level, ...)
@@ -154,7 +154,7 @@ local function logf(level, ...)
 end
 
 if opts.maxvol then
-	local maxvol = tonumber(tostring(opts.maxvol))
+	local maxvol=tonumber(tostring(opts.maxvol))
 	if not maxvol then
 		error("Invalid value for option 'maxvol': " .. tostring(opts.maxvol), 0)
 	elseif maxvol < 0 or maxvol > 7 then
@@ -165,9 +165,9 @@ if opts.maxvol then
 	end
 end
 
-local drumvol = 2
+local drumvol=2
 if opts.drumvol then
-	drumvol = tonumber(tostring(opts.drumvol))
+	drumvol=tonumber(tostring(opts.drumvol))
 	if not drumvol then
 		error("Invalid value for option 'drumvol': " .. tostring(opts.drumvol), 0)
 	elseif drumvol < 0 or drumvol > 7 then
@@ -177,14 +177,14 @@ end
 
 if opts.mute then
 	for part in (opts.mute .. ","):gmatch("(.-),") do
-		local chmn=tonumber(part,10)
+		local chmn=tonumber(part, 10)
 		if chmn == nil then
 			error("Invalid channel for option 'mute': " .. part, 0)
 		elseif chmn < -16 or chmn > 16 then
 			error("Invalid channel for option 'mute': " .. math.abs(chmn), 0)
 		elseif chmn == 0 then
 			local all=(part:sub(1, 1) == "-")
-			for i=0,15 do
+			for i=0, 15 do
 				chlisten[i]=all
 			end
 		else
@@ -195,13 +195,13 @@ end
 
 if opts.mutet then
 	for part in (opts.mutet .. ","):gmatch("(.-),") do
-		local trmn=tonumber(part,10)
+		local trmn=tonumber(part, 10)
 		if trmn == nil then
 			error("Invalid track for option 'mutet': " .. part, 0)
 		elseif trmn < -65536 or trmn > 65536 then
 			error("Invalid track for option 'mutet': " .. math.abs(trmn), 0)
 		elseif trmn == 0 then
-			trlisten=setmetatable({default=(part:sub(1, 1) == "-")},trlisten_mt)
+			trlisten=setmetatable({default=(part:sub(1, 1) == "-")}, trlisten_mt)
 		else
 			trlisten[math.abs(trmn)-1]=trmn < 0
 		end
@@ -210,7 +210,7 @@ end
 
 local speed
 if opts.speed then
-	speed = tonumber(tostring(opts.speed))
+	speed=tonumber(tostring(opts.speed))
 	if not speed then
 		error("Invalid value for option 'speed': " .. tostring(opts.speed), 0)
 	elseif speed < 0 or speed > 255 then
@@ -221,8 +221,8 @@ end
 if opts.chvol then
 	for part in (opts.chvol .. ","):gmatch("(.-),") do
 		local ch, vol=part:match("(.*):(.+)")
-		ch=tonumber(ch,10)
-		vol=tonumber(vol,10)
+		ch=tonumber(ch, 10)
+		vol=tonumber(vol, 10)
 		if ch == nil or vol == nil then
 			error("Invalid value for option 'chvol': " .. part, 0)
 		elseif ch < 1 or ch > 16 then
@@ -286,36 +286,36 @@ text_event_0e=true,
 text_event_0f=true,
 }
 local function score2note(score)
-	local note = {score[1]}
+	local note={score[1]}
 	local trackpos={}
-	local nscore = #score
-	for i = 2, nscore do
+	local nscore=#score
+	for i=2, nscore do
 		trackpos[i]=1
 	end
 	while true do
 		local ltime, tpos=math.huge
-		for i = 2, nscore do
-			local event = score[i][trackpos[i]]
+		for i=2, nscore do
+			local event=score[i][trackpos[i]]
 			if event then
-				local ttime = event[2]
+				local ttime=event[2]
 				if ttime < ltime then
-					ltime, tpos = ttime, i
+					ltime, tpos=ttime, i
 				end
 			end
 		end
 		if not tpos then break end
-		local event = score[tpos][trackpos[tpos]]
-		score[tpos][trackpos[tpos]] = nil
-		trackpos[tpos] = trackpos[tpos] + 1
+		local event=score[tpos][trackpos[tpos]]
+		score[tpos][trackpos[tpos]]=nil
+		trackpos[tpos]=trackpos[tpos] + 1
 		table.insert(event, 3, tpos-2)
 		-- Merge text events into one event type
 		local kind=event[1]
 		if text_events[kind] then
-			kind=kind:gsub("_event",""):gsub("_text","")
+			kind=kind:gsub("_event", ""):gsub("_text", "")
 			table.insert(event, 4, kind)
 			event[1]="text"
 		end
-		note[#note+1] = event
+		note[#note+1]=event
 	end
 	return note
 end
@@ -334,16 +334,16 @@ if data == nil then
 	os.exit(1)
 end
 
-if data:sub(1,4) ~= "MThd" then
+if data:sub(1, 4) ~= "MThd" then
 	print("MIDI header missing from file")
 	os.exit(1)
 end
 
-local mididata = score2note(midi.midi2score(data))
+local mididata=score2note(midi.midi2score(data))
 
 local function gcd(m, n)
 	while m ~= 0 do
-		m, n = n%m, m
+		m, n=n%m, m
 	end
 	return n
 end
@@ -353,12 +353,12 @@ if not div then
 	for i=2, #mididata do
 		local event=mididata[i]
 		if event[1] == "note" and chlisten[event[5]] and trlisten[event[3]] then
-			local time = event[2]-skip
-			if time>0 then
+			local time=event[2]-skip
+			if time > 0 then
 				if not div then
-					div = time
+					div=time
 				else
-					div = math.min(div, gcd(div, time))
+					div=math.min(div, gcd(div, time))
 					if div == 1 then
 						error("Failed to detect time division!", 0)
 					end
@@ -398,15 +398,15 @@ if not speed then
 end
 
 local function note2pico(note, drum)
-	local val = (note-36)+(drum and dshift or shift)
-	local msg = (drum and "Drum note" or "Note")
+	local val=(note-36)+(drum and dshift or shift)
+	local msg=(drum and "Drum note" or "Note")
 	if val > 63 then
 		logf(2, "Warning: %s too high, truncating: %d, %+d", msg, val, val-63)
-		val = 63
+		val=63
 	end
 	if val < 0 then
 		logf(2, "Warning: %s too low, truncating: %d", msg, val)
-		val = 0
+		val=0
 	end
 	return val
 end
@@ -442,7 +442,7 @@ local function resetmidi()
 end
 resetmidi()
 
-local die = false
+local die=false
 local mtime=-math.huge
 local stime=math.huge
 
@@ -451,7 +451,7 @@ local function parseevent(event)
 		event[2]=event[2]-skip
 		if event[2]/div ~= math.floor(event[2]/div) then
 			print("Invalid division: " .. event[2] .. " -> " .. event[2]/div)
-			die = true
+			die=true
 		end
 		local time=math.floor(event[2]/div)
 		mtime=math.max(mtime, time)
@@ -485,7 +485,7 @@ local function parseevent(event)
 			for i=1, 4 do
 				if chunk[i] == nil then
 					chunk[i]=chunkdata
-					placed = true
+					placed=true
 					break
 				end
 			end
@@ -495,8 +495,8 @@ local function parseevent(event)
 			local kill
 			local note=event[6]
 			for i=1, 4 do
-				if event[6]>chunk[i].note then
-					kill = i
+				if event[6] > chunk[i].note then
+					kill=i
 				end
 			end
 			if kill then
@@ -509,9 +509,9 @@ local function parseevent(event)
 		if event[5] == 1 then
 			-- No Banks.
 		elseif event[5] == 6 then
-			if lrpn==true then
+			if lrpn == true then
 				rpn[event[4]][rpns[event[4]]]=event[6]
-			elseif lrpn==false then
+			elseif lrpn == false then
 				nrpn[event[4]][nrpns[event[4]]]=event[6]
 			end
 			lrpn=nil
@@ -520,16 +520,16 @@ local function parseevent(event)
 		elseif event[5] == 10 then
 			-- No Panning.
 		elseif event[5] == 98 then
-			nrpns[event[4]] = bit.bor(bit.band(nrpns[event[4]], 0x3f80), event[6])
+			nrpns[event[4]]=bit.bor(bit.band(nrpns[event[4]], 0x3f80), event[6])
 			lrpn=false
 		elseif event[5] == 99 then
-			nrpns[event[4]] = bit.bor(bit.band(nrpns[event[4]], 0x7f), bit.lshift(event[6], 7))
+			nrpns[event[4]]=bit.bor(bit.band(nrpns[event[4]], 0x7f), bit.lshift(event[6], 7))
 			lrpn=false
 		elseif event[5] == 100 then
-			rpns[event[4]] = bit.bor(bit.band(rpns[event[4]], 0x3f80), event[6])
+			rpns[event[4]]=bit.bor(bit.band(rpns[event[4]], 0x3f80), event[6])
 			lrpn=true
 		elseif event[5] == 101 then
-			rpns[event[4]] = bit.bor(bit.band(rpns[event[4]], 0x7f), bit.lshift(event[6], 7))
+			rpns[event[4]]=bit.bor(bit.band(rpns[event[4]], 0x7f), bit.lshift(event[6], 7))
 			lrpn=true
 		else
 			--log(2, "Warning: Unknown Control Parameter: " .. table.concat(event, ", "))
@@ -550,8 +550,8 @@ local function parseevent(event)
 	end
 end
 for i=2, #mididata do
-	local event = mididata[i]
-	local ok, err = pcall(parseevent, event)
+	local event=mididata[i]
+	local ok, err=pcall(parseevent, event)
 	if not ok then
 		io.stderr:write("Crashed parsing event : {" .. table.concat(event, ", ") .. "}\n\n" .. err .. "\n")
 		os.exit(1)
@@ -569,15 +569,15 @@ for i=0, mtime do
 		local chunk=slice[i]
 		for j=1, 4 do
 			if chunk[j] and chunk[j].durat then
-				local kstop = math.ceil(chunk[j].durat/div)-1
+				local kstop=math.ceil(chunk[j].durat/div)-1
 				for k=1, kstop do
-					mtime = math.max(mtime, i+k)
+					mtime=math.max(mtime, i+k)
 					local chunk2=getChunk(i+k)
 					if not chunk2[j] then
 						chunk2[j]={}
 					end
 					if not chunk2[j].note then
-						for i=1,#cpparm do
+						for i=1, #cpparm do
 							chunk2[j][cpparm[i]]=chunk[j][cpparm[i]]
 						end
 						chunk2[j].pos=((k == kstop) and "E" or "M")
@@ -599,10 +599,10 @@ for i=0, mtime do
 		end
 	end
 end
-if lostnotes>0 then
+if lostnotes > 0 then
 	logf(1, "Info: Lost %d notes", lostnotes)
 end
-if lostnotes>0 and not opts.noregain then
+if lostnotes > 0 and not opts.noregain then
 	local regained=0
 	log(1, "Info: Attempting to regain notes ...")
 	for i=0, mtime do
@@ -621,13 +621,13 @@ if lostnotes>0 and not opts.noregain then
 					end
 					if tj then
 						for k=1, schunk.lost do
-							mtime = math.max(mtime, i+k)
+							mtime=math.max(mtime, i+k)
 							local chunk2=getChunk(i+k)
 							if not chunk2[tj] then
 								chunk2[tj]={}
 							end
 							if not chunk2[tj].note then
-								for i=1,#cpparm do
+								for i=1, #cpparm do
 									chunk2[tj][cpparm[i]]=schunk[cpparm[i]]
 								end
 								chunk2[tj].pos=((k == schunk.lost) and "E" or "M")
@@ -666,9 +666,9 @@ if not opts.no2ndpass then
 	local function parseevent2(event)
 		if event[1] == "control_change" then
 			if event[5] == 6 then
-				if lrpn==true then
+				if lrpn == true then
 					rpn[event[4]][rpns[event[4]]]=event[6]
-					if rpns[event[4]]==0 then
+					if rpns[event[4]] == 0 then
 						local time=math.floor(event[2]/div)
 						if not pass2nd[time] then
 							pass2nd[time]={}
@@ -679,7 +679,7 @@ if not opts.no2ndpass then
 						end
 						chunk.pwheel[event[4]]=pwheel[event[4]]/8192*event[6]
 					end
-				elseif lrpn==false then
+				elseif lrpn == false then
 					nrpn[event[4]][nrpns[event[4]]]=event[6]
 				end
 				lrpn=nil
@@ -694,16 +694,16 @@ if not opts.no2ndpass then
 				end
 				chunk.vol[event[4]]=event[6]
 			elseif event[5] == 98 then
-				nrpns[event[4]] = bit.bor(bit.band(nrpns[event[4]], 0x3f80), event[6])
+				nrpns[event[4]]=bit.bor(bit.band(nrpns[event[4]], 0x3f80), event[6])
 				lrpn=false
 			elseif event[5] == 99 then
-				nrpns[event[4]] = bit.bor(bit.band(nrpns[event[4]], 0x7f), bit.lshift(event[6], 7))
+				nrpns[event[4]]=bit.bor(bit.band(nrpns[event[4]], 0x7f), bit.lshift(event[6], 7))
 				lrpn=false
 			elseif event[5] == 100 then
-				rpns[event[4]] = bit.bor(bit.band(rpns[event[4]], 0x3f80), event[6])
+				rpns[event[4]]=bit.bor(bit.band(rpns[event[4]], 0x3f80), event[6])
 				lrpn=true
 			elseif event[5] == 101 then
-				rpns[event[4]] = bit.bor(bit.band(rpns[event[4]], 0x7f), bit.lshift(event[6], 7))
+				rpns[event[4]]=bit.bor(bit.band(rpns[event[4]], 0x7f), bit.lshift(event[6], 7))
 				lrpn=true
 			end
 		elseif event[1] == "patch_change" then
@@ -722,8 +722,8 @@ if not opts.no2ndpass then
 		end
 	end
 	for i=2, #mididata do
-		local event = mididata[i]
-		local ok, err = pcall(parseevent2, event)
+		local event=mididata[i]
+		local ok, err=pcall(parseevent2, event)
 		if not ok then
 			io.stderr:write("Crashed parsing event : {" .. table.concat(event, ", ") .. "}\n\n" .. err .. "\n")
 			os.exit(1)
@@ -732,7 +732,7 @@ if not opts.no2ndpass then
 	do
 		local vol={}
 		local pwheel={}
-		for i=0,15 do
+		for i=0, 15 do
 			vol[i]=127
 			pwheel[i]=0
 		end
@@ -771,7 +771,7 @@ if not opts.no2ndpass then
 	end
 end
 if stime ~= 0 then
-	log(1, "Info: Trimming " .. stime .. " slices  ...")
+	log(1, "Info: Trimming " .. stime .. " slices ...")
 	for i=stime, mtime+stime do
 		slice[i-stime]=slice[i]
 	end
@@ -782,7 +782,7 @@ local pats=math.ceil(mtime/32)-1
 log(1, "Info: " .. pats+1 .. " patterns")
 for block=0, pats*32, 32 do
 	local top=0
-	for i = 0, 31 do
+	for i=0, 31 do
 		local chunk=getChunk(i+block)
 		for j=1, 4 do
 			if chunk[j] then
@@ -790,7 +790,7 @@ for block=0, pats*32, 32 do
 			end
 		end
 	end
-	if top<4 then
+	if top < 4 then
 		log(1, "Info: Saved " .. 4-top .. " in pattern " .. block/32)
 	end
 end
@@ -800,11 +800,11 @@ local patmap={}
 for block=0, pats*32, 32 do
 	for block2=block+32, pats*32, 32 do
 		local same=true
-		for i = 0, 31 do
+		for i=0, 31 do
 			local chunk=slice[i+block]
 			local chunk2=slice[i+block2]
 			for j=1, 4 do
-				if chunk[j]~=chunk2[j] then
+				if chunk[j] ~= chunk2[j] then
 					same=false
 					break
 				end
@@ -822,7 +822,7 @@ end
 local outfile, err
 if args[2] then
 	log(1, "Info: Writing to '" .. args[2] .. "'")
-	outfile, err = io.open(args[2], "wb")
+	outfile, err=io.open(args[2], "wb")
 	if not outfile then
 		error(err, 0)
 	end
@@ -844,37 +844,37 @@ local count=0
 
 local sfxdata -- for musichax
 if not opts.musichax then
-	linemap[string.format("01%02x0000", tonumber(speed))..string.rep("0",32*5)]=-1 -- don't emit empty pattern.
+	linemap[string.format("01%02x0000", tonumber(speed))..string.rep("0", 32*5)]=-1 -- don't emit empty pattern.
 else
 	linemap[string.rep("\0", 64)]=-1 -- don't emit empty pattern.
 	sfxdata=""
 end
 for block=0, pats*32, 32 do
 	local top=0
-	for i = 0, 31 do
+	for i=0, 31 do
 		local chunk=getChunk(i+block)
 		for j=1, 4 do
 			if chunk[j] and chunk[j].note then
 				top=math.max(top, j)
 			end
 		end
-		if top==4 then
+		if top == 4 then
 			break
 		end
 	end
 	for j=1, top do
 		local line, empty
 		if not opts.musichax then
-			line = string.format("01%02x0000", tonumber(speed))
-			empty = "00000"
+			line=string.format("01%02x0000", tonumber(speed))
+			empty="00000"
 		else
-			line = ""
-			empty = "\0\0"
+			line=""
+			empty="\0\0"
 		end
-		for i = 0, 31 do
+		for i=0, 31 do
 			local chunk=getChunk(i+block)
 			if chunk[j] and chunk[j].note then
-				local info = chunk[j]
+				local info=chunk[j]
 				if opts.nopwheel then
 					info.pwheel=0
 				end
@@ -882,34 +882,34 @@ for block=0, pats*32, 32 do
 					info.vol=127
 					info.vel=127
 				end
-				local instr = info.prgm
-				local drum = drumch[info.ch]
-				local val = note2pico(math.floor(info.note+info.pwheel+0.5), drum)
+				local instr=info.prgm
+				local drum=drumch[info.ch]
+				local val=note2pico(math.floor(info.note+info.pwheel+0.5), drum)
 				if val <= 63 then
 					local place=3
-					if info.pos=="S" then
+					if info.pos == "S" then
 						place=2
-					elseif info.pos=="E" then
+					elseif info.pos == "E" then
 						place=4
 					end
-					local instrdata = drum and picodrum[instr] or picoinstr[instr]
+					local instrdata=drum and picodrum[instr] or picoinstr[instr]
 					if instrdata[place] ~= -1 then
-						local note, instr, vol, fx = val, instrdata[1], drum and drumvol or math.floor((info.vol/127)*(info.vel/127)*(chvol[info.ch]-1)+1.5), instrdata[place]
+						local note, instr, vol, fx=val, instrdata[1], drum and drumvol or math.floor((info.vol/127)*(info.vel/127)*(chvol[info.ch]-1)+1.5), instrdata[place]
 						if not opts.musichax then
-							line = line .. string.format("%02x%x%s%x", note, instr, vol, fx)
+							line=line .. string.format("%02x%x%s%x", note, instr, vol, fx)
 						else
-							local combo = (note*(2^0))+(instr*(2^6))+(vol*(2^9))+(fx*(2^12))
-							line = line .. string.char(combo%256, math.floor(combo/256))
+							local combo=(note*(2^0))+(instr*(2^6))+(vol*(2^9))+(fx*(2^12))
+							line=line .. string.char(combo%256, math.floor(combo/256))
 						end
 					else
-						line = line .. empty
+						line=line .. empty
 					end
 				else
 					log(2, "Dropping high pitched note.")
-					line = line .. empty
+					line=line .. empty
 				end
 			else
-				line = line .. empty
+				line=line .. empty
 			end
 		end
 		if not linemap[line] then
@@ -933,19 +933,19 @@ for block=0, pats*32, 32 do
 		end
 	end
 	local patblock={}
-	for i = 0, top-1 do
+	for i=0, top-1 do
 		patblock[#patblock+1]=linemap[base+i] or base+i
 	end
 	base=base+top
 	patsel[block/32]=patblock
 end
 for block=0, pats do
-	local patblock = patsel[block]
+	local patblock=patsel[block]
 	for i=1, #patblock do
 		local val=patblock[i]
 		local subtract=0
 		for i=1, #kill do
-			if kill[i]<=val then
+			if kill[i] <= val then
 				subtract=subtract+1
 			else
 				break
@@ -962,15 +962,15 @@ local firstpat
 for block=0, pats do
 	local line
 	if opts.musichax then
-		line = ""
+		line=""
 	elseif first then
-		line = "01 "
+		line="01 "
 	elseif block == pats then
-		line = "02 "
+		line="02 "
 	else
-		line = "00 "
+		line="00 "
 	end
-	local patblock = patsel[block]
+	local patblock=patsel[block]
 	if not opts.musichax then
 		for i=1, 4 do
 			if patblock[i] and patblock[i] >= 0x40 then
@@ -1015,7 +1015,7 @@ for block=0, pats do
 end
 if opts.musichax then
 	outfile:write(sfxdata)
-	local padding = 0x4300-4-((pats-firstpat+1)*4)-#sfxdata-(68*4)
+	local padding=0x4300-4-((pats-firstpat+1)*4)-#sfxdata-(68*4)
 	if padding < 0 then
 		error("too much data for MusicHAX")
 	end
