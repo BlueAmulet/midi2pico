@@ -329,6 +329,16 @@ end
 local data=file:read("*a")
 file:close()
 
+if data == nil then
+	print("Received no data from file?")
+	os.exit(1)
+end
+
+if data:sub(1,4) ~= "MThd" then
+	print("MIDI header missing from file")
+	os.exit(1)
+end
+
 local mididata = score2note(midi.midi2score(data))
 
 local function gcd(m, n)
