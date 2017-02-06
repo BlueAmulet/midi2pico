@@ -63,6 +63,7 @@ Options:
 	--no2ndpass Skip second corrective pass
 	--nopwheel  Ignore pitch wheel data
 	--novol     Ignore volume data
+	--noexpr    Ignore expression data
 	--notrunc   Keep going despite no more sfx
 
 	All options above take the form: --name
@@ -421,6 +422,7 @@ end
 
 -- Configured Midi Information
 local vol={}
+local expr={}
 local prgm={}
 local pwheel={}
 local nrpn={}
@@ -431,6 +433,7 @@ local lrpn
 local function resetmidi()
 	for i=0, 15 do
 		vol[i]=127
+		expr[i]=127
 		prgm[i]=0
 		pwheel[i]=0
 		nrpn[i]={[0]=2}
@@ -457,7 +460,7 @@ local function parseevent(event)
 		mtime=math.max(mtime, time)
 		stime=math.min(stime, time)
 		local chunk=getChunk(time)
-		local chunkdata={note=event[6], vol=vol[event[5]], vel=event[7], prgm=prgm[event[5]], pwheel=pwheel[event[5]]/8192*rpn[event[5]][0], ch=event[5], durat=event[4]}
+		local chunkdata={note=event[6], vol=vol[event[5]], expr=expr[event[5]], vel=event[7], prgm=prgm[event[5]], pwheel=pwheel[event[5]]/8192*rpn[event[5]][0], ch=event[5], durat=event[4]}
 		if drumch[event[5]] then
 			chunkdata.prgm=chunkdata.note
 			chunkdata.note=picodrum[chunkdata.prgm][5]
@@ -519,6 +522,8 @@ local function parseevent(event)
 			vol[event[4]]=event[6]
 		elseif event[5] == 10 then
 			-- No Panning.
+		elseif event[5] == 11 then
+			expr[event[4]]=event[6]
 		elseif event[5] == 98 then
 			nrpns[event[4]]=bit.bor(bit.band(nrpns[event[4]], 0x3f80), event[6])
 			lrpn=false
@@ -562,7 +567,7 @@ if die then
 	--os.exit(1)
 end
 log(1, "Info: Extending notes ...")
-local cpparm={"note", "vol", "vel", "prgm", "pwheel", "ch"}
+local cpparm={"note", "vol", "expr", "vel", "prgm", "pwheel", "ch"}
 local lostnotes=0
 for i=0, mtime do
 	if slice[i] then
@@ -693,6 +698,16 @@ if not opts.no2ndpass then
 					chunk.vol={}
 				end
 				chunk.vol[event[4]]=event[6]
+			elseif event[5] == 11 then
+				local time=math.floor(event[2]/div)
+				if not pass2nd[time] then
+					pass2nd[time]={}
+				end
+				local chunk=pass2nd[time]
+				if not chunk.expr then
+					chunk.expr={}
+				end
+				chunk.expr[event[4]]=event[6]
 			elseif event[5] == 98 then
 				nrpns[event[4]]=bit.bor(bit.band(nrpns[event[4]], 0x3f80), event[6])
 				lrpn=false
@@ -731,18 +746,26 @@ if not opts.no2ndpass then
 	end
 	do
 		local vol={}
+		local expr={}
 		local pwheel={}
 		for i=0, 15 do
 			vol[i]=127
+			expr[i]=127
 			pwheel[i]=0
 		end
 		for i=0, mtime do
 			if pass2nd[i] then
 				local vold=pass2nd[i].vol
+				local exprd=pass2nd[i].expr
 				local pwheeld=pass2nd[i].pwheel
 				if vold then
 					for i=0, 15 do
 						if vold[i] then vol[i]=vold[i] end
+					end
+				end
+				if exprd then
+					for i=0, 15 do
+						if exprd[i] then expr[i]=exprd[i] end
 					end
 				end
 				if pwheeld then
@@ -760,6 +783,10 @@ if not opts.no2ndpass then
 							logf(2, "Warning: Corrected volume from %s to %s", schunk.vol, vol[schunk.ch])
 						end
 						schunk.vol=vol[schunk.ch]
+						if expr[schunk.ch] ~= schunk.expr and not opts.noexpr then
+							logf(2, "Warning: Corrected expression from %s to %s", schunk.expr, expr[schunk.ch])
+						end
+						schunk.expr=expr[schunk.ch]
 						if pwheel[schunk.ch] ~= schunk.pwheel and not opts.nopwheel then
 							logf(2, "Warning: Corrected pitch wheel from %s to %s", schunk.pwheel, pwheel[schunk.ch])
 						end
@@ -878,9 +905,13 @@ for block=0, pats*32, 32 do
 				if opts.nopwheel then
 					info.pwheel=0
 				end
+				if opts.noexpr then
+					info.expr=127
+				end
 				if opts.novol then
 					info.vol=127
 					info.vel=127
+					info.expr=127
 				end
 				local instr=info.prgm
 				local drum=drumch[info.ch]
@@ -894,7 +925,7 @@ for block=0, pats*32, 32 do
 					end
 					local instrdata=drum and picodrum[instr] or picoinstr[instr]
 					if instrdata[place] ~= -1 then
-						local note, instr, vol, fx=val, instrdata[1], drum and drumvol or math.floor((info.vol/127)*(info.vel/127)*(chvol[info.ch]-1)+1.5), instrdata[place]
+						local note, instr, vol, fx=val, instrdata[1], drum and drumvol or math.floor((info.vol/127)*(info.vel/127)*(info.expr/127)*(chvol[info.ch]-1)+1.5), instrdata[place]
 						if not opts.musichax then
 							line=line .. string.format("%02x%x%s%x", note, instr, vol, fx)
 						else
