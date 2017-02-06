@@ -59,12 +59,21 @@ Options:
 	All options above take the form: --name=value
 
 	--clean     Don't output sfx and pattern info at end of lines
+	--musichax  Write a special program to stream additional audio from gfx
 	--no2ndpass Skip second corrective pass
 	--nopwheel  Ignore pitch wheel data
 	--novol     Ignore volume data
 	--notrunc   Keep going despite no more sfx
 
 	All options above take the form: --name
+
+MusicHAX:
+	MusicHAX is a system to store more audio data than pico-8 normally allows,
+	audio data is stored in gfx areas and copied into sfx as needed. Enabling
+	this option will output a binary file instead of p8 data, and can be
+	converted using p8convert to get a runnable cart.
+
+	p8convert is located here: https://github.com/gamax92/pico8-imgtools
 ]])
 	return
 end
@@ -82,7 +91,7 @@ local picoinstr={}
 for i=0, 127 do
 	picoinstr[i]={3, 0, 0, 5}
 end
-picoinstr[30]={5, 0, 0, 5} -- Distortd
+picoinstr[30]={4, 0, 0, 5} -- Distortd
 picoinstr[33]={1, 0, 0, 5} -- FngrBass
 picoinstr[38]={1, 0, 0, 5} -- SynBass1
 picoinstr[42]={5, 4, 0, 5} -- Cello
@@ -807,17 +816,29 @@ if args[2] then
 	if not outfile then
 		error(err, 0)
 	end
+elseif opts.musichax then
+	print("Refusing to write binary data to stdout.")
+	os.exit(1)
 else
 	log(1, "Info: Writing to stdout")
 	outfile=io.stdout
 end
-outfile:write("__sfx__\n")
+if not opts.musichax then
+	outfile:write("__sfx__\n")
+end
 local base=0
 local patsel={}
 local linemap={}
 local kill={}
 local count=0
-linemap[string.format("01%02x0000", tonumber(speed))..string.rep("0",32*5)]=-1 -- don't emit empty pattern.
+
+local sfxdata -- for musichax
+if not opts.musichax then
+	linemap[string.format("01%02x0000", tonumber(speed))..string.rep("0",32*5)]=-1 -- don't emit empty pattern.
+else
+	linemap[string.rep("\0", 64)]=-1 -- don't emit empty pattern.
+	sfxdata=""
+end
 for block=0, pats*32, 32 do
 	local top=0
 	for i = 0, 31 do
@@ -832,7 +853,14 @@ for block=0, pats*32, 32 do
 		end
 	end
 	for j=1, top do
-		local line = string.format("01%02x0000", tonumber(speed))
+		local line, empty
+		if not opts.musichax then
+			line = string.format("01%02x0000", tonumber(speed))
+			empty = "00000"
+		else
+			line = ""
+			empty = "\0\0"
+		end
 		for i = 0, 31 do
 			local chunk=getChunk(i+block)
 			if chunk[j] and chunk[j].note then
@@ -856,25 +884,38 @@ for block=0, pats*32, 32 do
 					end
 					local instrdata = drum and picodrum[instr] or picoinstr[instr]
 					if instrdata[place] ~= -1 then
-						line = line .. string.format("%02x%x%s%x", val, instrdata[1], drum and drumvol or math.floor((info.vol/127)*(info.vel/127)*(chvol[info.ch]-1)+1.5), instrdata[place])
+						local note, instr, vol, fx = val, instrdata[1], drum and drumvol or math.floor((info.vol/127)*(info.vel/127)*(chvol[info.ch]-1)+1.5), instrdata[place]
+						if not opts.musichax then
+							line = line .. string.format("%02x%x%s%x", note, instr, vol, fx)
+						else
+							local combo = (note*(2^0))+(instr*(2^6))+(vol*(2^9))+(fx*(2^12))
+							line = line .. string.char(combo%256, math.floor(combo/256))
+						end
 					else
-						line = line .. "00000"
+						line = line .. empty
 					end
 				else
 					log(2, "Dropping high pitched note.")
-					line = line .. "00000"
+					line = line .. empty
 				end
 			else
-				line = line .. "00000"
+				line = line .. empty
 			end
 		end
 		if not linemap[line] then
 			linemap[line]=base+j-1
-			if count >= 64 and not opts.notrunc then
-				outfile:close()
-				error("Midi is too long or time division is too short.\nUse --notrunc to continue writing.", 0)
+			if not opts.musichax then
+				if count >= 64 and not opts.notrunc then
+					outfile:close()
+					error("Midi is too long or time division is too short.\nUse --notrunc to continue writing.", 0)
+				end
+				outfile:write(line..(not opts.clean and string.format(" %02x", count) or "").."\n")
+			else
+				sfxdata=sfxdata..line
+				if #sfxdata/64 >= 256 then
+					error("Too much sfx data", 0)
+				end
 			end
-			outfile:write(line..(not opts.clean and string.format(" %02x", count) or "").."\n")
 			count=count+1
 		else
 			linemap[base+j-1]=linemap[line]
@@ -903,11 +944,16 @@ for block=0, pats do
 		patblock[i]=val-subtract
 	end
 end
-outfile:write("__music__\n")
+if not opts.musichax then
+	outfile:write("__music__\n")
+end
 local first=true
+local firstpat
 for block=0, pats do
 	local line
-	if first then
+	if opts.musichax then
+		line = ""
+	elseif first then
 		line = "01 "
 	elseif block == pats then
 		line = "02 "
@@ -915,27 +961,68 @@ for block=0, pats do
 		line = "00 "
 	end
 	local patblock = patsel[block]
-	for i=1, 4 do
-		if patblock[i] and patblock[i] >= 0x40 then
-			if opts.notrunc then
-				logf(2, "Warning: Ran out of sfx: %d, (%02x)", patblock[i], patblock[i])
-			else
-				outfile:close()
-				error("Midi is too long or time division is too short.\nUse --notrunc to continue writing.", 0)
+	if not opts.musichax then
+		for i=1, 4 do
+			if patblock[i] and patblock[i] >= 0x40 then
+				if opts.notrunc then
+					logf(2, "Warning: Ran out of sfx: %d, (%02x)", patblock[i], patblock[i])
+				else
+					outfile:close()
+					error("Midi is too long or time division is too short.\nUse --notrunc to continue writing.", 0)
+				end
+			end
+			if not patblock[i] or patblock[i] == -1 then
+				patblock[i]=0x40
+			elseif patblock[i] >= 0x40 then
+				patblock[i]=0x40
+			end
+			patblock[i]=string.format("%02x", patblock[i])
+		end
+		local pattern=table.concat(patblock, "")
+		if not first or pattern ~= "40404040" then
+			first=false
+			outfile:write(line .. table.concat(patblock, "")..(not opts.clean and " "..block or "").."\n")
+		end
+	else
+		for i=1, 4 do
+			if not patblock[i] or patblock[i] == -1 then
+				patblock[i]=0xFF
 			end
 		end
-		if not patblock[i] or patblock[i] == -1 then
-			patblock[i]=0x40
-		elseif patblock[i] >= 0x40 then
-			patblock[i]=0x40
+		local pattern=string.char(patblock[1], patblock[2], patblock[3], patblock[4])
+		if not first or pattern ~= "\255\255\255\255" then
+			if first then
+				if pats-block >= 256 then
+					error("Too many patterns", 0)
+				end
+				outfile:write(string.char(pats-block, #sfxdata/64-1, 0, pats-block)) -- number of patterns, number of sfx, loop start, loop end
+				firstpat=block
+			end
+			first=false
+			outfile:write(pattern)
 		end
-		patblock[i]=string.format("%02x", patblock[i])
 	end
-	local pats = table.concat(patblock, "")
-	if not first or pats ~= "40404040" then
-		first=false
-		outfile:write(line .. table.concat(patblock, "")..(not opts.clean and " "..block or "").."\n")
+end
+if opts.musichax then
+	outfile:write(sfxdata)
+	local padding = 0x4300-4-((pats-firstpat+1)*4)-#sfxdata-(68*4)
+	if padding < 0 then
+		error("too much data for MusicHAX")
 	end
+	outfile:write(string.rep("\0", padding))
+	for i=1, 4 do
+		outfile:write(string.rep("\0", 64).."\1"..string.char(speed).."\0\32")
+	end
+	local mhsfile, err=io.open("musichax-stub.lua", "rb")
+	if not mhsfile then
+		error(err, 0)
+	end
+	local code=mhsfile:read("*a")
+	mhsfile:close()
+	outfile:write(code)
+	outfile:write(string.rep("\0", 15616-#code))
+	--TODO: proper metadata?
+	outfile:write(string.rep("\0", 32))
 end
 if args[2] then
 	outfile:close()
