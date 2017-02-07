@@ -66,6 +66,10 @@ Options:
 	--noexpr    Ignore expression data
 	--notrunc   Keep going despite no more sfx
 
+	--ignorediv Ignore bad time divisions
+	--fixdivone Correct time divisions off by one
+	--analysis  Analyse and report on time information
+
 	All options above take the form: --name
 
 MusicHAX:
@@ -383,6 +387,21 @@ local function gcd(m, n)
 	return n
 end
 
+-- MIDI timing analytics
+local commondiv={}
+for i=1, 30 do
+	commondiv[i*5]=0
+	commondiv[i*6]=0
+end
+
+local timediff={}
+local lnote=0
+
+if opts.analysis and not opts.ignorediv then
+	log(2, "Warning: --analysis implies --ignorediv")
+	opts.ignorediv=true
+end
+
 if not div then
 	log(1, "Info: Attempting to detect time division ...")
 	for i=2, #mididata do
@@ -390,21 +409,135 @@ if not div then
 		if event[1] == "note" and chlisten[event[5]] and trlisten[event[3]] then
 			local time=event[2]-skip
 			if time > 0 then
+				if opts.analysis and time-lnote > 0 then
+					timediff[time-lnote]=(timediff[time-lnote] or 0)+1
+					lnote=time
+				end
 				if not div then
 					div=time
-				else
-					div=math.min(div, gcd(div, time))
+					commondiv[div]=1
 					if div == 1 then
-						error("Failed to detect time division!", 0)
+						print("\nError: Failed to detect time division! First note starts at 1")
+						os.exit(1)
+					end
+				else
+					local ldiv=div
+					div=math.min(div, gcd(div, time))
+					if opts.analysis then
+						if not commondiv[div] then
+							commondiv[div]=1
+						else
+							local highest=-math.huge
+							for k, v in pairs(commondiv) do
+								if time/k == math.floor(time/k) or (opts.fixdivone and ((time-1)/k == math.floor((time-1)/k) or (time+1)/k == math.floor((time+1)/k))) then
+									highest=math.max(highest, k)
+								end
+							end
+							commondiv[highest]=commondiv[highest]+1
+						end
+					end
+					if ldiv ~= div and opts.fixdivone then
+						if math.min(ldiv, gcd(ldiv, time-1)) == ldiv then
+							div=ldiv
+							logf(2, "Warning: Corrected off by one error at %d/%d (-1)", time, div)
+						elseif math.min(ldiv, gcd(ldiv, time+1)) == ldiv then
+							div=ldiv
+							logf(2, "Warning: Corrected off by one error at %d/%d (+1)", time, div)
+						end
+					end
+					if div == 1 then
+						local bad=time/ldiv
+						if not opts.ignorediv then
+							print("\nError: Failed to detect time division!")
+							print("Last good division was "..ldiv)
+							print("Bad note at "..time.."/"..ldiv.." = "..bad.." ("..math.floor(bad).." + "..time-math.floor(bad)*ldiv.."/"..ldiv..")")
+							print("\nTry using --analysis for suggestions")
+							print("--ignorediv and --fixdivone may help correct errors")
+							os.exit(1)
+						else
+							log(2, "Warning: Ignoring bad time division of "..time.."/"..ldiv.." = "..bad)
+							div=ldiv
+						end
 					end
 				end
 			end
 		end
 	end
 	if not div then
-		error("Failed to detect time division!", 0)
+		print("\nError: Failed to detect time division! No notes?", 0)
+		os.exit(1)
 	end
 	log(1, "Info: Detected: " .. div)
+end
+
+local function process(tbl, message)
+	print(message)
+	local high=-math.huge
+	local highk=-math.huge
+	local sorttbl={}
+	for k, v in pairs(tbl) do
+		if v > high then
+			highk, high=k, v
+		elseif v == high then
+			highk=math.max(highk, k)
+		end
+		sorttbl[#sorttbl+1]={k, v}
+	end
+	table.sort(sorttbl, function(a, b) return a[2]<b[2] end)
+	for i=1, #sorttbl do
+		local k, v=sorttbl[i][1], sorttbl[i][2]
+		if v ~= 0 then
+			if v == high then
+				k="["..k.."]"
+			end
+			print(k..") "..v)
+		end
+	end
+	return high, highk
+end
+
+if opts.analysis then
+	local cdhigh, cdhighk=process(commondiv, "\nInfo: Common div usage:")
+	local cthigh, cthighk=process(timediff, "\nInfo: Common time difference:")
+
+	local factor=math.min(cdhighk, cthighk, gcd(cdhighk, cthighk))
+	print("\nInfo: Greatest common factor: "..factor)
+
+	if factor ~= 1 then
+		print("Try with --div="..factor)
+	else
+		print("Error: Analysis resulted in div of 1.")
+	end
+	local cdlowest=cdhighk
+	while commondiv[cdlowest/2] do
+		cdlowest=cdlowest/2
+	end
+	local ctlowest=cthighk
+	while timediff[ctlowest/2] do
+		ctlowest=ctlowest/2
+	end
+
+	local try={}
+	if cdhighk ~= 1 then
+		try[#try+1]=cdhighk
+	end
+	if cthighk ~= 1 and cthighk ~= cdhighk then
+		try[#try+1]=cthighk
+	end
+	if cdlowest ~= 1 and cdlowest ~= cdhighk then
+		try[#try+1]=cdlowest
+	end
+	if ctlowest ~= 1 and ctlowest ~= cthighk then
+		try[#try+1]=ctlowest
+	end
+	if #try > 0 then
+		local msg=(factor ~= 1) and "Other choices" or "Possibly try"
+		print(msg..": "..table.concat(try, ", "))
+	else
+		print("No suggestions available, look at above lists")
+	end
+
+	os.exit(1)
 end
 
 if not speed then
