@@ -163,6 +163,7 @@ local chvol={}
 for i=0, 15 do
 	chvol[i]=5
 end
+chvol[9]=2
 
 local maxlevel=math.huge
 if opts.level then
@@ -189,17 +190,23 @@ if opts.maxvol then
 		error("Invalid range for option 'maxvol': " .. maxvol, 0)
 	end
 	for i=0, 15 do
-		chvol[i]=maxvol
+		if not drumch[i] then
+			chvol[i]=maxvol
+		end
 	end
 end
 
-local drumvol=2
 if opts.drumvol then
-	drumvol=tonumber(tostring(opts.drumvol))
+	local drumvol=tonumber(tostring(opts.drumvol))
 	if not drumvol then
 		error("Invalid value for option 'drumvol': " .. tostring(opts.drumvol), 0)
 	elseif drumvol < 0 or drumvol > 7 then
 		error("Invalid range for option 'drumvol': " .. drumvol, 0)
+	end
+	for i=0, 15 do
+		if drumch[i] then
+			chvol[i]=drumvol
+		end
 	end
 end
 
@@ -913,7 +920,7 @@ for block=0, pats*32, 32 do
 					end
 					local instrdata=drum and picodrum[instr] or picoinstr[instr]
 					if instrdata[place] ~= -1 then
-						local note, instr, vol, fx=val, instrdata[1], drum and drumvol or math.floor((info.vol/127)*(info.vel/127)*(info.expr/127)*(chvol[info.ch]-1)+1.5), instrdata[place]
+						local note, instr, vol, fx=val, instrdata[1], math.floor((info.vol/127)*(info.vel/127)*(info.expr/127)*(chvol[info.ch]-1)+1.5), instrdata[place]
 						if not opts.musichax then
 							line=line .. string.format("%02x%x%s%x", note, instr, vol, fx)
 						else
