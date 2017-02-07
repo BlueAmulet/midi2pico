@@ -75,10 +75,8 @@ Options:
 MusicHAX:
 	MusicHAX is a system to store more audio data than pico-8 normally allows,
 	audio data is stored in gfx areas and copied into sfx as needed. Enabling
-	this option will output a binary file instead of p8 data, and can be
-	converted using p8convert to get a runnable cart.
-
-	p8convert is located here: https://github.com/gamax92/pico8-imgtools
+	this option will use this system and also output a lua stub to process and
+	play the music.
 ]])
 	return
 end
@@ -981,9 +979,6 @@ if args[2] then
 	if not outfile then
 		error(err, 0)
 	end
-elseif opts.musichax then
-	print("Refusing to write binary data to stdout.")
-	os.exit(1)
 else
 	log(1, "Info: Writing to stdout")
 	outfile=io.stdout
@@ -997,7 +992,9 @@ local linemap={}
 local kill={}
 local count=0
 
-local sfxdata -- for musichax
+-- for musichax
+local sfxdata
+local cartdata
 if not opts.musichax then
 	linemap[string.format("01%02x0000", tonumber(speed))..string.rep("0", 32*5)]=-1 -- don't emit empty pattern.
 else
@@ -1164,23 +1161,23 @@ for block=0, pats do
 				if pats-block >= 256 then
 					error("Too many patterns", 0)
 				end
-				outfile:write(string.char(pats-block, #sfxdata/64-1, 0, pats-block)) -- number of patterns, number of sfx, loop start, loop end
+				cartdata=string.char(pats-block, #sfxdata/64-1, 0, pats-block) -- number of patterns, number of sfx, loop start, loop end
 				firstpat=block
 			end
 			first=false
-			outfile:write(pattern)
+			cartdata=cartdata..pattern
 		end
 	end
 end
 if opts.musichax then
-	outfile:write(sfxdata)
+	cartdata=cartdata..sfxdata
 	local padding=0x4300-4-((pats-firstpat+1)*4)-#sfxdata-(68*4)
 	if padding < 0 then
 		error("too much data for MusicHAX")
 	end
-	outfile:write(string.rep("\0", padding))
+	cartdata=cartdata..string.rep("\0", padding)
 	for i=1, 4 do
-		outfile:write(string.rep("\0", 64).."\1"..string.char(speed).."\0\32")
+		cartdata=cartdata..string.rep("\0", 64).."\1"..string.char(speed).."\0\32"
 	end
 	local mhsfile, err=io.open("musichax-stub.lua", "rb")
 	if not mhsfile then
@@ -1188,10 +1185,49 @@ if opts.musichax then
 	end
 	local code=mhsfile:read("*a")
 	mhsfile:close()
-	outfile:write(code)
-	outfile:write(string.rep("\0", 15616-#code))
-	--TODO: proper metadata?
-	outfile:write(string.rep("\0", 32))
+
+	-- write cart
+	local bin2hex=function(a) return ("%02x"):format(a:byte()) end
+	outfile:write([[pico-8 cartridge // http://www.pico-8.com
+version 8
+__lua__
+]]..code.."\n__gfx__\n")
+	for i=0, 0x1fff, 64 do
+		outfile:write(cartdata:sub(i+1, i+64):gsub(".", function(a) a=a:byte() return string.format("%02x", bit.bor(bit.lshift(bit.band(a, 0x0f), 4), bit.rshift(bit.band(a, 0xf0), 4))) end).."\n")
+	end
+	outfile:write("__gff__\n")
+	for i=0x3000, 0x30ff, 128 do
+		outfile:write(cartdata:sub(i+1, i+128):gsub(".", bin2hex).."\n")
+	end
+	outfile:write("__map__\n")
+	for i=0x2000, 0x2fff, 128 do
+		outfile:write(cartdata:sub(i+1, i+128):gsub(".", function(a) return ("%02x"):format(a:byte()) end).."\n")
+	end
+	outfile:write("__sfx__\n")
+	for i=0x3200, 0x42ff, 68 do
+		local sfx=cartdata:sub(i+65, i+68):gsub(".", bin2hex)
+		local notes=cartdata:sub(i+1, i+64):gsub("..", function(a)
+			local l, h=a:byte(1, -1)
+			a=bit.bor(bit.lshift(h, 8), l)
+			local note=bit.band(a, 0x003f)
+			local instr=bit.rshift(bit.band(a, 0x01c0), 6)
+			local vol=bit.rshift(bit.band(a, 0x0e00), 9)
+			local fx=bit.rshift(bit.band(a, 0x7000), 12)
+			return string.format("%02x%x%s%x", note, instr, vol, fx)
+		end)
+		outfile:write(sfx..notes.."\n")
+	end
+	outfile:write("__music__\n")
+	for i=0x3100, 0x31ff, 4 do
+		local loop=0
+		local chn={cartdata:byte(i+1, i+4)}
+		for j=0, 3 do
+			loop=bit.bor(loop, bit.lshift(bit.band(chn[j+1], 0x80) ~= 0 and 1 or 0, j))
+			chn[j+1]=bit.band(chn[j+1], 0x7f)
+		end
+		outfile:write(("%02x %02x%02x%02x%02x\n"):format(loop, chn[1], chn[2], chn[3], chn[4]))
+	end
+	outfile:write("\n")
 end
 if args[2] then
 	outfile:close()
