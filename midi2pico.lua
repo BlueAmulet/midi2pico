@@ -1201,7 +1201,7 @@ __lua__
 	end
 	outfile:write("__map__\n")
 	for i=0x2000, 0x2fff, 128 do
-		outfile:write(cartdata:sub(i+1, i+128):gsub(".", function(a) return ("%02x"):format(a:byte()) end).."\n")
+		outfile:write(cartdata:sub(i+1, i+128):gsub(".", bin2hex).."\n")
 	end
 	outfile:write("__sfx__\n")
 	for i=0x3200, 0x42ff, 68 do
