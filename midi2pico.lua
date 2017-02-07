@@ -834,45 +834,6 @@ if stime ~= 0 then
 end
 local pats=math.ceil(mtime/32)-1
 log(1, "Info: " .. pats+1 .. " patterns")
-for block=0, pats*32, 32 do
-	local top=0
-	for i=0, 31 do
-		local chunk=getChunk(i+block)
-		for j=1, 4 do
-			if chunk[j] then
-				top=math.max(top, j)
-			end
-		end
-	end
-	if top < 4 then
-		log(1, "Info: Saved " .. 4-top .. " in pattern " .. block/32)
-	end
-end
---Diagnostics only, needs fixing.
---[[
-local patmap={}
-for block=0, pats*32, 32 do
-	for block2=block+32, pats*32, 32 do
-		local same=true
-		for i=0, 31 do
-			local chunk=slice[i+block]
-			local chunk2=slice[i+block2]
-			for j=1, 4 do
-				if chunk[j] ~= chunk2[j] then
-					same=false
-					break
-				end
-			end
-			if not same then
-				break
-			end
-		end
-		if same and not patmap[block2/32] then
-			log(1, "Info: pattern " .. block/32 .. " is the same as " .. block2/32)
-		end
-	end
-end
---]]
 local outfile, err
 if args[2] then
 	log(1, "Info: Writing to '" .. args[2] .. "'")
