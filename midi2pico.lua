@@ -543,15 +543,18 @@ if not speed then
 	log(1, "Info: Attempting to detect speed ...")
 	local tempo
 	local warned=false
+	local notes=false
 	for i=2, #mididata do
 		local event=mididata[i]
 		if event[1] == "set_tempo" then
-			if not tempo or event[2] == 0 then
+			if not tempo or event[2] == 0 or not notes then
 				tempo=event[4]
 			elseif tempo ~= event[4] and not warned then
 				log(1, "Info: midi changes tempo mid song, this is currently not supported.")
 				warned=true
 			end
+		elseif event[1] == "note" then
+			notes=true
 		end
 	end
 	if not tempo then
