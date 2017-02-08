@@ -613,7 +613,6 @@ local function resetmidi()
 end
 resetmidi()
 
-local die=false
 local mtime=-math.huge
 local stime=math.huge
 
@@ -622,7 +621,6 @@ local function parseevent(event)
 		event[2]=event[2]-skip
 		if event[2]/div ~= math.floor(event[2]/div) then
 			print("Invalid division: " .. event[2] .. " -> " .. event[2]/div)
-			die=true
 		end
 		local time=math.floor(event[2]/div)
 		mtime=math.max(mtime, time)
@@ -731,9 +729,6 @@ for i=2, #mididata do
 	end
 end
 
-if die then
-	--os.exit(1)
-end
 log(1, "Info: Extending notes ...")
 local cpparm={"note", "vol", "expr", "vel", "prgm", "pwheel", "ch"}
 local lostnotes=0
