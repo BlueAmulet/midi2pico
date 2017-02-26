@@ -12,6 +12,9 @@ end
 if not table.pack then
 	function table.pack(...) return {n=select("#", ...), ...} end
 end
+if not table.unpack then
+	table.unpack = unpack
+end
 
 local bit=bit
 if not bit then
@@ -703,7 +706,6 @@ local function parseevent(event)
 			rpns[event[4]]=bit.bor(bit.band(rpns[event[4]], 0x7f), bit.lshift(event[6], 7))
 			lrpn=true
 		else
-			--log(2, "Warning: Unknown Control Parameter: " .. table.concat(event, ", "))
 			local time, track, channel, control, value=table.unpack(event, 2)
 			channel=channel+1
 			logf(2, "Warning: Unknown Control Parameter: {%d, T%d, CH%d, C%d, V%d}", time, track, channel, control, value)
