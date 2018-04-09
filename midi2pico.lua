@@ -689,8 +689,11 @@ local function parseevent(event)
 			lrpn=nil
 		elseif event[5] == 7 then
 			vol[event[4]]=event[6]
-		elseif event[5] == 10 then
-			-- No Panning.
+		elseif event[5] == 8 or event[5] == 10 then
+			-- No Balance/Panning.
+			if event[6] ~= 64 then
+				logf(2, "Warning: " .. (event[5] == 8 and "balance" or "panning") .. " (ch:" .. event[4] .. "=" .. (event[6]-64) .. ") is not supported.")
+			end
 		elseif event[5] == 11 then
 			expr[event[4]]=event[6]
 		elseif event[5] == 98 then
@@ -708,7 +711,7 @@ local function parseevent(event)
 		else
 			local time, track, channel, control, value=table.unpack(event, 2)
 			channel=channel+1
-			logf(2, "Warning: Unknown Control Parameter: {%d, T%d, CH%d, C%d, V%d}", time, track, channel, control, value)
+			logf(2, "Warning: Unknown Controller: {%d, T%d, CH%d, CC%d, V%d}", time, track, channel, control, value)
 		end
 	elseif event[1] == "patch_change" then
 		prgm[event[4]]=event[5]
