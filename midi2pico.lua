@@ -678,7 +678,7 @@ local function parseevent(event)
 	elseif event[1] == "text" then
 		log(1, "Info: (Text) " .. event[4] .. ": " .. event[5])
 	elseif event[1] == "control_change" then
-		if event[5] == 1 then
+		if event[5] == 0 then
 			-- No Banks.
 		elseif event[5] == 6 then
 			if lrpn == true then
