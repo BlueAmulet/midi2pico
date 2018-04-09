@@ -68,6 +68,7 @@ Options:
 	--novol     Ignore volume data
 	--noexpr    Ignore expression data
 	--notrunc   Keep going despite no more sfx
+	--stub      Write a lua stub to automatically play the generated music
 
 	--ignorediv Ignore bad time divisions
 	--fixdivone Correct time divisions off by one
@@ -987,6 +988,14 @@ else
 	outfile=io.stdout
 end
 if not opts.musichax then
+	if opts.stub then
+	outfile:write([[pico-8 cartridge // http://www.pico-8.com
+version 8
+__lua__
+music(0)
+function _update() end
+]])
+	end
 	outfile:write("__sfx__\n")
 end
 local base=0
