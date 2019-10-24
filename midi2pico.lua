@@ -42,7 +42,7 @@ function math.round(n)
 	return math.floor(n+0.5)
 end
 
-if #args < 1 then
+if #args < 1 or opts.help then
 	print([[
 Usage: ]] .. (arg and arg[0] or "midi2pico") .. [[ midi-file [p8-data]
 
@@ -61,7 +61,7 @@ Options:
 
 	All options above take the form: --name=value
 
-	--clean     Don't output sfx and pattern info at end of lines
+	--debug     Output sfx and pattern info at end of lines
 	--musichax  Write a special program to stream additional audio from gfx
 	--no2ndpass Skip second corrective pass
 	--nopwheel  Ignore pitch wheel data
@@ -988,10 +988,11 @@ else
 	outfile=io.stdout
 end
 if not opts.musichax then
-	if opts.stub then
 	outfile:write([[pico-8 cartridge // http://www.pico-8.com
 version 8
-__lua__
+]])
+	if opts.stub then
+	outfile:write([[__lua__
 music(0)
 function _update() end
 ]])
@@ -1087,7 +1088,7 @@ for block=0, pats*32, 32 do
 					outfile:close()
 					error("Midi is too long or time division is too short.\nUse --notrunc to continue writing.", 0)
 				end
-				outfile:write(line..(not opts.clean and string.format(" %02x", count) or "").."\n")
+				outfile:write(line..(opts.debug and string.format(" %02x", count) or "").."\n")
 			else
 				sfxdata=sfxdata..line
 				if #sfxdata/64 >= 256 then
@@ -1159,7 +1160,7 @@ for block=0, pats do
 		local pattern=table.concat(patblock, "")
 		if not first or pattern ~= "40404040" then
 			first=false
-			outfile:write(line .. table.concat(patblock, "")..(not opts.clean and " "..block or "").."\n")
+			outfile:write(line .. table.concat(patblock, "")..(opts.debug and " "..block or "").."\n")
 		end
 	else
 		for i=1, 4 do
