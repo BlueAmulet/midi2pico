@@ -662,7 +662,7 @@ local function parseevent(event)
 	if event[1] == "note" and chlisten[event[5]] and trlisten[event[3]] and event[2]-skip >= 0 then
 		event[2]=event[2]-skip
 		if event[2]/div ~= math.floor(event[2]/div) then
-			print("Invalid division: " .. event[2] .. " -> " .. event[2]/div)
+			log(2, "Invalid division: " .. event[2] .. " -> " .. event[2]/div)
 		end
 		local time=math.floor(event[2]/div)
 		mtime=math.max(mtime, time)
@@ -731,7 +731,7 @@ local function parseevent(event)
 		elseif event[5] == 8 or event[5] == 10 then
 			-- No Balance/Panning.
 			if event[6] ~= 64 then
-				logf(2, "Warning: " .. (event[5] == 8 and "balance" or "panning") .. " (ch:" .. event[4] .. "=" .. (event[6]-64) .. ") is not supported.")
+				log(2, "Warning: " .. (event[5] == 8 and "balance" or "panning") .. " (ch:" .. event[4] .. "=" .. (event[6]-64) .. ") is not supported.")
 			end
 		elseif event[5] == 11 then
 			expr[event[4]]=event[6]
@@ -758,7 +758,7 @@ local function parseevent(event)
 		if not drumch[event[4]] then
 			pwheel[event[4]]=event[5]
 		else
-			logf(2, "Warning: Ignoring pitch wheel event on drum channel: " .. event[4])
+			log(2, "Warning: Ignoring pitch wheel event on drum channel: " .. event[4])
 		end
 	else
 
@@ -868,7 +868,7 @@ if lostnotes > 0 and not opts.noregain then
 	end
 	logf(1, "Info: Regained %d notes", regained)
 	if lostnotes == regained then
-		logf(1, "Info: Regained all notes back!")
+		log(1, "Info: Regained all notes back!")
 	end
 end
 if not opts.no2ndpass then
